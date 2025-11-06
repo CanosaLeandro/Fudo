@@ -1,0 +1,17 @@
+development:
+  adapter: postgres
+  host: localhost
+  database: fudo_development
+  user: postgres
+  password: postgres
+
+test:
+  adapter: postgres
+  host: localhost
+  database: fudo_test
+  user: postgres
+  password: postgres
+
+production:
+  adapter: postgres
+  url: <%= ENV['DATABASE_URL'] %>
