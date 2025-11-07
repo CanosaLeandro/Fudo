@@ -1,0 +1,1 @@
+Fudo es una aplicación para poder administrar y gestionar negocios gastronómicos. Se basa en un sistema de gestión (POS), el cual permite manejar diferentes operaciones desde la gestión de pedidos, control de mesas y mozos, pagos, control de stock, incluso integración para aplicaciones de delivery

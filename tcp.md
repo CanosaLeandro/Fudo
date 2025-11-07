@@ -1,0 +1,2 @@
+TCP (Transmission Control Protocol) es un protocolo de comunicación que garantiza la transmisión confiable y ordenada de datos entre computadoras en una red.
+Divide la información en paquetes, los envía y asegura que lleguen completos y en el orden correcto, a diferencia del protocolo UDP.
