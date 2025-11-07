@@ -1,17 +1,22 @@
 development:
   adapter: postgres
-  host: localhost
+  host: host.docker.internal # puede que haya que cambiar los hosts por localhost aca, yo porque trabajo con WSL
   database: fudo_development
   user: postgres
   password: postgres
+  port: 5432
 
 test:
   adapter: postgres
-  host: localhost
+  host: host.docker.internal
   database: fudo_test
   user: postgres
   password: postgres
 
 production:
   adapter: postgres
-  url: <%= ENV['DATABASE_URL'] %>
+  host: host.docker.internal
+  database: fudo_production
+  user: postgres
+  password: postgres
+  port: 5432

@@ -1,0 +1,45 @@
+services:
+  redis:
+    image: redis:7
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+
+  api:
+    build: .
+    command: ./scripts/start_server.sh
+    volumes:
+      - .:/app
+      - gem_cache:/usr/local/bundle
+    ports:
+      - "9292:9292"
+    env_file:
+      - .env.sample
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/fudo_development}
+      - JWT_SECRET=${JWT_SECRET:-change_me_in_production}
+      - SESSION_SECRET=${SESSION_SECRET:-change_me_in_production}
+    depends_on:
+      - redis
+
+  sidekiq:
+    build: .
+    command: ./scripts/start_sidekiq.sh
+    volumes:
+      - .:/app
+      - gem_cache:/usr/local/bundle
+    env_file:
+      - .env.sample
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/fudo_development}
+    depends_on:
+      - redis
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  gem_cache:
