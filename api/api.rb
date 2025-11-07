@@ -1,62 +1,79 @@
-require 'cuba'
-require "cuba/safe"
-require 'json'
-require 'sequel'
-require 'bcrypt'
-require 'jwt'
+require 'bigdecimal'
 require 'dotenv/load'
+require 'erb'
+require 'json'
 require 'rack/protection'
 require 'yaml'
-
-# Load environment variables
-Dotenv.load
+require "cuba/safe"
+require_relative 'endpoints/auth'
+require_relative 'endpoints/products'
+require_relative 'lib/api_error_handler'
 
 # Database connection
-DB = Sequel.connect(YAML.load_file('config/database.yml')[ENV['RACK_ENV'] || 'development'])
-
-# Load paths
-require_relative 'paths'
-
-Dir[File.join(__dir__, 'models', '*.rb')].sort.each do |file|
-  require_relative "models/#{File.basename(file, '.rb')}"
+begin
+  # Prefer DATABASE_URL if provided (Docker, cloud envs)
+  if ENV['DATABASE_URL'] && !ENV['DATABASE_URL'].empty?
+    DB = Sequel.connect(ENV['DATABASE_URL'])
+  else
+    # Evaluate ERB in YAML (so production.url: <%= ENV['DATABASE_URL'] %> works)
+    raw = File.read('config/database.yml')
+    cfg = YAML.safe_load(ERB.new(raw).result, aliases: true)
+    env = ENV['RACK_ENV'] || 'development'
+    DB = Sequel.connect(cfg[env])
+  end
+rescue => e
+  warn "[boot] Database connection failed: #{e.class} - #{e.message}"
+  raise
 end
+
+# Redis connection for token blacklist
+REDIS = Redis.new(url: ENV['REDIS_URL'] || 'redis://localhost:6379')
+
+# Load paths and initialize application structure
+require_relative 'paths'
 
 Cuba.use Rack::Session::Cookie, secret: ENV['SESSION_SECRET']
 Cuba.use Rack::Protection
 Cuba.use Rack::Protection::RemoteReferrer
 
-Cuba.plugin(Cuba::Safe)
+Cuba.plugin Cuba::Safe
+Cuba.plugin Shield::Helpers
 
 Cuba.define do
+  on get do
+    on "api/v1" do
+      on "product" do
+        Endpoints::Products.show(req, res, REDIS)
+      end
+
+      on "products" do
+        Endpoints::Products.list(req, res, REDIS)
+      end
+    end
+
+    on "AUTHORS" do
+      Endpoints::Static.authors(res)
+    end
+
+    on "openapi.yaml" do
+      Endpoints::Static.openapi(res)
+    end
+  end
+
   on post do
     on "api/v1" do
+      # Auth endpoints
       on "login" do
-        begin
-          payload = JSON.parse(req.body.read)
-          email = payload['email']
-          password = payload['password']
-
-          user = User.authenticate(email, password)
-          
-          if user
-            token = JWT.encode(
-              { user_id: user.id, exp: Time.now.to_i + 123456 },
-              ENV['JWT_SECRET'],
-              'HS256'
-            )
-            res.status = 200
-            res.write({ token: token }.to_json)
-          else
-            res.status = 401
-            res.write({ error: 'Invalid credentials' }.to_json)
-          end
-        rescue JSON::ParserError
-          res.status = 400
-          res.write({ error: 'Invalid JSON payload' }.to_json)
-        rescue StandardError => e
-          res.status = 500
-          res.write({ error: 'Internal server error' }.to_json)
-        end
+        Endpoints::Auth.login(req, res)
+      end
+      
+      on "logout" do
+        Endpoints::Auth.logout(req, res, REDIS)
+      end
+      
+      # Products endpoints
+      on "product" do
+        Endpoints::Products.create(req, res, REDIS)
       end
     end
   end
